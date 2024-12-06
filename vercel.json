@@ -6,11 +6,25 @@
       "use": "@vercel/static-build",
       "config": { 
         "distDir": "dist",
-        "buildCommand": "npm ci && npm run clean:install && npm run build"
+        "buildCommand": "npm ci && npm run build"
       }
     }
   ],
   "routes": [
+    {
+      "src": "/assets/(.*)\\.js",
+      "headers": {
+        "Content-Type": "application/javascript"
+      },
+      "continue": true
+    },
+    {
+      "src": "/assets/(.*)\\.css",
+      "headers": {
+        "Content-Type": "text/css"
+      },
+      "continue": true
+    },
     {
       "src": "/(.*)",
       "dest": "/index.html"

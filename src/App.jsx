@@ -77,11 +77,11 @@ function App() {
   const axiosConfig = useMemo(() => ({
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'Origin': APP_DOMAIN
     },
-    withCredentials: true,
     timeout: 10000 // 10 second timeout
-  }), []);
+  }), [APP_DOMAIN]);
 
   // Debounce workspace change with shorter delay
   const debouncedWorkspaceChange = useCallback((value) => {

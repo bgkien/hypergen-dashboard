@@ -238,7 +238,7 @@ function App() {
       
       <main className="main">
         <div className="stats-summary">
-          <SummaryCard title="Total Contacted in Date Range" value={stats.totalContacted} />
+          <SummaryCard title="Total Contacted" value={stats.totalContacted} />
           <SummaryCard title="Total Replies in Date Range" value={stats.totalReplies} />
           <SummaryCard title="Positive Replies in Date Range" value={stats.positiveReplies} />
           <SummaryCard title="Active Campaigns in Date Range" value={stats.activeCampaigns} />

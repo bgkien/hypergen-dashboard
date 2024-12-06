@@ -119,63 +119,49 @@ function App() {
     setDateRange(newRange);
   }, []);
 
-  // Calculate stats from campaigns data
-  const calculateStats = useCallback((campaigns) => {
-    try {
-      logError('Calculating stats - Raw Campaigns', campaigns);
-
-      if (!Array.isArray(campaigns)) {
-        logError('Invalid campaigns data', { type: typeof campaigns });
-        return { 
-          totalContacted: 0,
-          totalReplies: 0,
-          positiveReplies: 0,
-          leadRate: '0%'
-        };
-      }
-
-      const stats = campaigns.reduce((acc, campaign) => {
-        const contacted = campaign.lead_contacted_count || 0;
-        const replies = campaign.replied_count || 0;
-        const positiveReplies = campaign.positive_reply_count || 0;
-
-        logError('Processing Campaign', {
-          name: campaign.camp_name,
-          contacted,
-          replies,
-          positiveReplies
-        });
-
-        return {
-          totalContacted: acc.totalContacted + contacted,
-          totalReplies: acc.totalReplies + replies,
-          positiveReplies: acc.positiveReplies + positiveReplies
-        };
-      }, { totalContacted: 0, totalReplies: 0, positiveReplies: 0 });
-
-      // Calculate lead rate
-      const leadRate = stats.totalContacted > 0 
-        ? ((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1) + '%'
-        : '0%';
-
-      const finalStats = {
-        ...stats,
-        leadRate
-      };
-
-      logError('Final Stats Calculation', finalStats);
-      return finalStats;
-
-    } catch (err) {
-      logError('Stats Calculation Error', err);
-      return { 
+  // Calculate stats from campaigns
+  const calculateStats = useCallback((campaignData) => {
+    if (!Array.isArray(campaignData)) {
+      logError('Invalid campaign data for stats calculation', campaignData);
+      return {
         totalContacted: 0,
         totalReplies: 0,
         positiveReplies: 0,
         leadRate: '0%'
       };
     }
+
+    const stats = campaignData.reduce((acc, campaign) => {
+      // Ensure numeric values
+      const contacted = Number(campaign.lead_contacted_count) || 0;
+      const replies = Number(campaign.replied_count) || 0;
+      const positiveReplies = Number(campaign.positive_reply_count) || 0;
+
+      return {
+        totalContacted: acc.totalContacted + contacted,
+        totalReplies: acc.totalReplies + replies,
+        positiveReplies: acc.positiveReplies + positiveReplies,
+      };
+    }, {
+      totalContacted: 0,
+      totalReplies: 0,
+      positiveReplies: 0
+    });
+
+    // Calculate lead rate
+    const leadRate = stats.totalContacted > 0
+      ? ((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)
+      : 0;
+
+    logError('Calculated stats:', { ...stats, leadRate: `${leadRate}%` });
+    return { ...stats, leadRate: `${leadRate}%` };
   }, []);
+
+  // Update stats when campaigns change
+  useEffect(() => {
+    const newStats = calculateStats(campaigns);
+    setStats(newStats);
+  }, [campaigns, calculateStats]);
 
   // Validate MongoDB ObjectId (24-character hex string only)
   const isValidObjectId = useCallback((id) => {
@@ -372,21 +358,23 @@ function App() {
 
       <main className="main">
         <div className="stats-summary">
-          <div className="summary-card">
-            <h3>Total Contacted</h3>
-            <span>{stats.totalContacted?.toLocaleString() || '0'}</span>
-          </div>
-          <div className="summary-card">
-            <h3>Total Replies</h3>
-            <span>{stats.totalReplies?.toLocaleString() || '0'}</span>
-          </div>
-          <div className="summary-card">
-            <h3>Positive Replies</h3>
-            <span>{stats.positiveReplies?.toLocaleString() || '0'}</span>
-          </div>
-          <div className="summary-card">
-            <h3>Lead Rate</h3>
-            <span>{stats.leadRate || '0%'}</span>
+          <div className="summary-cards">
+            <div className="card">
+              <h3>Total Contacted</h3>
+              <div className="metric">{stats.totalContacted.toLocaleString()}</div>
+            </div>
+            <div className="card">
+              <h3>Total Replies</h3>
+              <div className="metric">{stats.totalReplies.toLocaleString()}</div>
+            </div>
+            <div className="card">
+              <h3>Positive Replies</h3>
+              <div className="metric">{stats.positiveReplies.toLocaleString()}</div>
+            </div>
+            <div className="card">
+              <h3>Lead Rate</h3>
+              <div className="metric">{stats.leadRate}</div>
+            </div>
           </div>
         </div>
 

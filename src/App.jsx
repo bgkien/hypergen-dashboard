@@ -16,19 +16,21 @@ function logError(message, data = null) {
   console.error('🚨 ERROR LOG:', errorEntry);
 }
 
-// Use environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Environment variables and API configuration
+const isDevelopment = import.meta.env.DEV;
+const API_BASE_URL = isDevelopment ? '' : import.meta.env.VITE_API_BASE_URL; // Empty string for development to use proxy
 const APP_DOMAIN = import.meta.env.VITE_APP_DOMAIN;
 
 // Validate environment variables
-if (!API_BASE_URL) {
+if (!isDevelopment && !API_BASE_URL) {
   console.error('VITE_API_BASE_URL is not defined');
 }
 if (!APP_DOMAIN) {
   console.error('VITE_APP_DOMAIN is not defined');
 }
 
-console.log('API Base URL:', API_BASE_URL);
+console.log('Environment:', isDevelopment ? 'Development' : 'Production');
+console.log('API Base URL:', API_BASE_URL || '(using proxy)');
 console.log('App Domain:', APP_DOMAIN);
 
 // Memoized table row component

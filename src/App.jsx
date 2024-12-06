@@ -198,6 +198,23 @@ function App() {
         return acc;
       }
 
+      // Debug log campaign data
+      console.log('Raw campaign data:', {
+        id: campaign._id,
+        name: campaign.camp_name,
+        status: campaign.status,
+        stats: {
+          lead_count: campaign.lead_count,
+          completed_lead_count: campaign.completed_lead_count,
+          lead_contacted_count: campaign.lead_contacted_count,
+          sent_count: campaign.sent_count,
+          replied_count: campaign.replied_count,
+          positive_reply_count: campaign.positive_reply_count,
+          bounced_count: campaign.bounced_count,
+          unsubscribed_count: campaign.unsubscribed_count
+        }
+      });
+
       // Debug log for each campaign
       console.log('Campaign date check:', {
         campaignId: campaign._id,
@@ -206,20 +223,16 @@ function App() {
         campaignDate: campaignDate.toISOString(),
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        isInRange: campaignDate >= startDate && campaignDate <= endDate,
-        stats: {
-          contacted: campaign.lead_contacted_count || 0,
-          replies: campaign.replied_count || 0,
-          positiveReplies: campaign.positive_reply_count || 0
-        }
+        isInRange: campaignDate >= startDate && campaignDate <= endDate
       });
 
-      // Include both ACTIVE and COMPLETED campaigns
       if (campaignDate >= startDate && campaignDate <= endDate) {
-        const contacted = campaign.lead_contacted_count || 0;
-        const replies = campaign.replied_count || 0;
-        const positive = campaign.positive_reply_count || 0;
+        // Extract stats with proper type conversion and null checks
+        const contacted = parseInt(campaign.lead_contacted_count) || 0;
+        const replies = parseInt(campaign.replied_count) || 0;
+        const positive = parseInt(campaign.positive_reply_count) || 0;
 
+        // Update accumulator
         acc.totalContacted += contacted;
         acc.totalReplies += replies;
         acc.positiveReplies += positive;
@@ -228,9 +241,16 @@ function App() {
         console.log('Adding stats from campaign:', {
           name: campaign.camp_name,
           status: campaign.status,
-          contacted,
-          replies,
-          positive
+          stats: {
+            contacted,
+            replies,
+            positive
+          },
+          runningTotal: {
+            totalContacted: acc.totalContacted,
+            totalReplies: acc.totalReplies,
+            positiveReplies: acc.positiveReplies
+          }
         });
       }
       return acc;

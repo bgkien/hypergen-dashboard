@@ -149,12 +149,18 @@ function App() {
   }, [sortBy, sortOrder]);
 
   // Memoize stats calculation
-  const stats = useMemo(() => ({
-    totalContacted: campaigns.reduce((sum, camp) => sum + (camp.lead_contacted_count || 0), 0),
-    totalReplies: campaigns.reduce((sum, camp) => sum + (camp.replied_count || 0), 0),
-    positiveReplies: campaigns.reduce((sum, camp) => sum + (camp.positive_reply_count || 0), 0),
-    activeCampaigns: campaigns.filter(camp => camp.status === 'ACTIVE').length
-  }), [campaigns]);
+  const stats = useMemo(() => {
+    const totalContacted = campaigns.reduce((sum, camp) => sum + (camp.lead_contacted_count || 0), 0);
+    const positiveReplies = campaigns.reduce((sum, camp) => sum + (camp.positive_reply_count || 0), 0);
+    
+    return {
+      totalContacted,
+      totalReplies: campaigns.reduce((sum, camp) => sum + (camp.replied_count || 0), 0),
+      positiveReplies,
+      activeCampaigns: campaigns.filter(camp => camp.status === 'ACTIVE').length,
+      leadRate: totalContacted ? ((positiveReplies / totalContacted) * 100).toFixed(1) + '%' : '0%'
+    };
+  }, [campaigns]);
 
   useEffect(() => {
     fetchWorkspaces();
@@ -241,6 +247,7 @@ function App() {
           <SummaryCard title="Total Contacted" value={stats.totalContacted} />
           <SummaryCard title="Total Replies in Date Range" value={stats.totalReplies} />
           <SummaryCard title="Positive Replies in Date Range" value={stats.positiveReplies} />
+          <SummaryCard title="Lead Rate" value={stats.leadRate} />
           <SummaryCard title="Active Campaigns in Date Range" value={stats.activeCampaigns} />
         </div>
 

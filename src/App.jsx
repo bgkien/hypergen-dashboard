@@ -105,7 +105,6 @@ function App() {
 
   // Initialize axios defaults
   useEffect(() => {
-    axios.defaults.headers.common['Access-Control-Allow-Origin'] = APP_DOMAIN;
     axios.defaults.withCredentials = true;
   }, []);
 

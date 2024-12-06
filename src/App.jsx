@@ -244,7 +244,11 @@ function Dashboard() {
     const currentReplyRate = totalContacted ? (totalReplies / totalContacted * 100) : 0;
     const prevReplyRate = prevTotalContacted ? (prevTotalReplies / prevTotalContacted * 100) : 0;
     const replyRateChange = calculateChange(currentReplyRate, prevReplyRate);
-    
+
+    const currentLeadRate = totalContacted ? (positiveReplies / totalContacted * 100) : 0;
+    const prevLeadRate = prevTotalContacted ? (prevPositiveReplies / prevTotalContacted * 100) : 0;
+    const leadRateChange = calculateChange(currentLeadRate, prevLeadRate);
+
     const positiveRepliesChange = calculateChange(positiveReplies, prevPositiveReplies);
 
     // Generate summary text with bullet points
@@ -257,7 +261,7 @@ function Dashboard() {
       totalContacted,
       totalReplies,
       positiveReplies,
-      leadRate: currentReplyRate.toFixed(1) + '%',
+      leadRate: currentLeadRate.toFixed(1) + '%',
       replyRate: currentReplyRate.toFixed(1) + '%',
       summaryText
     };

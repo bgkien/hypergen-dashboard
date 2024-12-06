@@ -80,7 +80,13 @@ function App() {
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
     const start = new Date();
-    start.setDate(end.getDate() - 7);
+    start.setDate(end.getDate() - 14); // Default to 14 days
+    
+    // Set time to start/end of day
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    console.log('Initializing date range:', { start, end });
     return {
       startDate: start,
       endDate: end
@@ -122,14 +128,25 @@ function App() {
   const handleDateChange = useCallback((newRange) => {
     console.log('Date range changed:', newRange);
     
+    if (!newRange.startDate || !newRange.endDate) {
+      console.error('Invalid date range:', newRange);
+      return;
+    }
+    
     // Ensure we have valid Date objects
     const startDate = new Date(newRange.startDate);
     const endDate = new Date(newRange.endDate);
+    
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      console.error('Invalid date objects:', { startDate, endDate });
+      return;
+    }
     
     // Set time to start/end of day
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
     
+    console.log('Setting new date range:', { startDate, endDate });
     setDateRange({
       startDate,
       endDate
@@ -146,10 +163,30 @@ function App() {
 
   // Filter campaign data for stats calculation
   const getFilteredStats = useCallback((campaigns, startDate, endDate) => {
+    console.log('Calculating stats for range:', { startDate, endDate });
+    console.log('Number of campaigns:', campaigns.length);
+    
+    // Validate inputs
+    if (!Array.isArray(campaigns) || !startDate || !endDate) {
+      console.error('Invalid inputs for getFilteredStats:', { campaigns, startDate, endDate });
+      return {
+        totalContacted: 0,
+        totalReplies: 0,
+        positiveReplies: 0,
+        leadRate: '0%'
+      };
+    }
+
     // Calculate stats from filtered data within date range
     const stats = campaigns.reduce((acc, campaign) => {
       // Check if campaign has any activity in the date range
       const campaignDate = new Date(campaign.last_activity_date || campaign.created_at);
+      
+      if (isNaN(campaignDate.getTime())) {
+        console.error('Invalid campaign date:', { campaign, campaignDate });
+        return acc;
+      }
+
       if (campaignDate >= startDate && campaignDate <= endDate) {
         acc.totalContacted += campaign.lead_contacted_count || 0;
         acc.totalReplies += campaign.replied_count || 0;
@@ -167,14 +204,20 @@ function App() {
       ? `${((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)}%`
       : '0%';
 
-    console.log('Filtered stats:', { startDate, endDate, stats });
+    console.log('Calculated stats:', stats);
     return stats;
   }, []);
 
   // Update stats when date range or campaigns change
   useEffect(() => {
+    console.log('Stats effect triggered:', { 
+      campaignsLength: campaigns.length,
+      dateRange
+    });
+
     if (campaigns.length > 0 && dateRange.startDate && dateRange.endDate) {
       const newStats = getFilteredStats(campaigns, dateRange.startDate, dateRange.endDate);
+      console.log('Setting new stats:', newStats);
       setStats(newStats);
     }
   }, [campaigns, dateRange, getFilteredStats]);

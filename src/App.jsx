@@ -44,6 +44,7 @@ function Dashboard() {
   const [previousCampaigns, setPreviousCampaigns] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -78,6 +79,33 @@ function Dashboard() {
   const debouncedDateChange = useCallback((newRange) => {
     setDateRange(newRange);
   }, []);
+
+  // Extract unique teams from workspace names
+  const teams = useMemo(() => {
+    const teamSet = new Set(workspaces.map(w => {
+      const parts = w.name.split('-');
+      return parts.length > 2 ? parts[2].trim() : 'Unknown';
+    }));
+    return ['ALL', ...Array.from(teamSet)].sort();
+  }, [workspaces]);
+
+  // Filter workspaces by team
+  const filteredWorkspaces = useMemo(() => {
+    if (selectedTeam === 'ALL') return workspaces;
+    return workspaces.filter(w => {
+      const parts = w.name.split('-');
+      const team = parts.length > 2 ? parts[2].trim() : 'Unknown';
+      return team === selectedTeam;
+    });
+  }, [workspaces, selectedTeam]);
+
+  // Handle team filter change
+  const handleTeamChange = (e) => {
+    setSelectedTeam(e.target.value);
+    // Reset workspace selection when team changes
+    setSelectedWorkspace('');
+    navigate('/');
+  };
 
   // Fetch workspaces
   const fetchWorkspaces = useCallback(async () => {
@@ -298,6 +326,20 @@ function Dashboard() {
         
         <div className="filters">
           <div className="filter-group">
+            <label>Team:</label>
+            <select 
+              value={selectedTeam}
+              onChange={handleTeamChange}
+              disabled={loading}
+            >
+              {teams.map(team => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
             <label>Workspace:</label>
             <select 
               value={selectedWorkspace} 
@@ -305,7 +347,7 @@ function Dashboard() {
               disabled={loading}
             >
               <option value="">Select Workspace</option>
-              {workspaces.map(workspace => (
+              {filteredWorkspaces.map(workspace => (
                 <option key={workspace._id} value={workspace._id}>
                   {workspace.name}
                 </option>

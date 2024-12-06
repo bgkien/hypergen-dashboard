@@ -12,21 +12,24 @@
   ],
   "routes": [
     {
-      "src": "/assets/(.*)\\.js",
+      "src": "^/assets/.*\\.js$",
       "headers": {
-        "Content-Type": "application/javascript"
-      },
-      "continue": true
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-type": "application/javascript; charset=utf-8"
+      }
     },
     {
-      "src": "/assets/(.*)\\.css",
+      "src": "^/assets/.*\\.css$",
       "headers": {
-        "Content-Type": "text/css"
-      },
-      "continue": true
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-type": "text/css; charset=utf-8"
+      }
     },
     {
-      "src": "/(.*)",
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
       "dest": "/index.html"
     }
   ],

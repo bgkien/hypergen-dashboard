@@ -74,13 +74,14 @@ function App() {
   });
 
   // Axios configuration with error logging
-  const axiosConfig = {
+  const axiosConfig = useMemo(() => ({
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
+    withCredentials: true,
     timeout: 10000 // 10 second timeout
-  };
+  }), []);
 
   // Debounce workspace change with shorter delay
   const debouncedWorkspaceChange = useCallback((value) => {
@@ -155,61 +156,153 @@ function App() {
     }
   }, []);
 
-  // Fetch workspaces
+  // Validate MongoDB ObjectId (24-character hex string only)
+  const isValidObjectId = useCallback((id) => {
+    return typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
+  }, []);
+
+  // Format error message for display
+  const formatErrorMessage = useCallback((error) => {
+    if (error.response?.data?.error && error.response?.data?.details) {
+      return `${error.response.data.error}: ${error.response.data.details}`;
+    }
+    return error.response?.data?.error || error.message || 'An unexpected error occurred';
+  }, []);
+
+  // Fetch workspaces with improved error handling
   const fetchWorkspaces = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${API_BASE_URL}/api/workspaces`, {
-        ...axiosConfig,
-        withCredentials: true
-      });
-      const workspaceData = response.data;
+      const response = await axios.get(`${API_BASE_URL}/api/workspaces`, axiosConfig);
       
-      if (!Array.isArray(workspaceData)) {
-        throw new Error('Invalid workspace data received');
+      if (!response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid workspace data received from server');
       }
       
+      // Validate and format workspace data
+      const workspaceData = response.data
+        .filter(workspace => workspace._id && workspace.name) // Ensure required fields exist
+        .map(workspace => ({
+          ...workspace,
+          _id: workspace._id.toString(), // Ensure ID is a string
+          name: workspace.name.trim() // Clean workspace name
+        }));
+      
+      if (workspaceData.length === 0) {
+        throw new Error('No valid workspaces found');
+      }
+
       setWorkspaces(workspaceData);
       
       // Set default workspace if none selected
-      if (workspaceData.length > 0 && !selectedWorkspace) {
+      if (!selectedWorkspace || !workspaceData.find(w => w._id === selectedWorkspace)) {
         setSelectedWorkspace(workspaceData[0]._id);
       }
+
+      logError('Workspaces fetched successfully', { count: workspaceData.length });
     } catch (error) {
-      console.error('Error fetching workspaces:', error);
-      setError(error.response?.data?.details || error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedWorkspace]);
-
-  // Fetch campaign data
-  const fetchCampaigns = useCallback(async () => {
-    if (!selectedWorkspace) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/campaign-stats`, {
-        params: {
-          workspaceId: selectedWorkspace,
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          status: statusFilter !== 'ALL' ? statusFilter : undefined
-        },
-        ...axiosConfig,
-        withCredentials: true
+      logError('Workspace fetch error', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
       });
-      setCampaigns(response.data);
-    } catch (err) {
-      console.error('Error fetching campaigns:', err);
-      setError(err.response?.data?.error || 'Failed to fetch campaigns');
+      setError(`Error loading workspaces: ${formatErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
-  }, [selectedWorkspace, dateRange, statusFilter, API_BASE_URL]);
+  }, [selectedWorkspace, API_BASE_URL, axiosConfig, formatErrorMessage]);
 
+  // Fetch campaigns with improved error handling
+  const fetchCampaigns = useCallback(async () => {
+    if (!selectedWorkspace) {
+      logError('No workspace selected');
+      setError('Please select a workspace');
+      return;
+    }
+
+    if (!isValidObjectId(selectedWorkspace)) {
+      logError('Invalid workspace ID format', { workspaceId: selectedWorkspace });
+      setError('Invalid workspace ID format. Please select a valid workspace.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Ensure dates are in YYYY-MM-DD format
+      const formattedStartDate = new Date(dateRange.startDate).toISOString().split('T')[0];
+      const formattedEndDate = new Date(dateRange.endDate).toISOString().split('T')[0];
+
+      const params = new URLSearchParams({
+        workspaceId: selectedWorkspace,
+        start_date: formattedStartDate,
+        end_date: formattedEndDate
+      });
+
+      if (statusFilter && statusFilter !== 'ALL') {
+        params.append('status', statusFilter);
+      }
+
+      const url = `${API_BASE_URL}/api/campaign-stats?${params.toString()}`;
+      logError('Fetching campaigns', { url, params: Object.fromEntries(params) });
+
+      const response = await axios.get(url, axiosConfig);
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('Invalid response format: expected an array of campaigns');
+      }
+
+      // Validate and format campaign data
+      const campaignData = response.data.map(campaign => ({
+        ...campaign,
+        _id: campaign._id.toString(),
+        camp_name: campaign.camp_name || 'Unnamed Campaign',
+        status: campaign.status || 'UNKNOWN',
+        lead_count: parseInt(campaign.lead_count) || 0,
+        completed_lead_count: parseInt(campaign.completed_lead_count) || 0,
+        lead_contacted_count: parseInt(campaign.lead_contacted_count) || 0,
+        sent_count: parseInt(campaign.sent_count) || 0,
+        replied_count: parseInt(campaign.replied_count) || 0,
+        positive_reply_count: parseInt(campaign.positive_reply_count) || 0,
+        bounced_count: parseInt(campaign.bounced_count) || 0,
+        unsubscribed_count: parseInt(campaign.unsubscribed_count) || 0,
+        created_at: campaign.created_at || new Date().toISOString()
+      }));
+
+      setCampaigns(campaignData);
+      
+      // Calculate and set stats
+      const calculatedStats = calculateStats(campaignData);
+      logError('Calculated Stats', calculatedStats);
+      setStats(calculatedStats);
+
+    } catch (error) {
+      logError('Campaign Fetch Error', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      });
+      
+      setError(`Error loading campaigns: ${formatErrorMessage(error)}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    selectedWorkspace,
+    dateRange,
+    statusFilter,
+    API_BASE_URL,
+    axiosConfig,
+    calculateStats,
+    isValidObjectId,
+    formatErrorMessage
+  ]);
+
+  // Sort campaigns
   const sortCampaigns = useCallback((data) => {
     return [...data].sort((a, b) => {
       let compareA = a[sortBy];

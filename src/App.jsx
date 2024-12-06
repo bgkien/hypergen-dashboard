@@ -131,6 +131,14 @@ function App() {
     });
   }, []);
 
+  // Filter campaigns by date range
+  const filterCampaignsByDate = useCallback((campaigns, startDate, endDate) => {
+    return campaigns.filter(campaign => {
+      const campaignDate = new Date(campaign.created_at);
+      return campaignDate >= startDate && campaignDate <= endDate;
+    });
+  }, []);
+
   // Calculate stats from campaign data
   const calculateStats = useCallback((campaignData) => {
     const stats = campaignData.reduce((acc, campaign) => {
@@ -275,9 +283,17 @@ function App() {
 
         console.log('Campaign data received:', response.data);
         
+        // Filter campaigns by date range
+        const filteredCampaigns = filterCampaignsByDate(
+          response.data,
+          dateRange.startDate,
+          dateRange.endDate
+        );
+        console.log('Filtered campaigns:', filteredCampaigns);
+        
         // Update campaigns and recalculate stats
-        setCampaigns(response.data);
-        const newStats = calculateStats(response.data);
+        setCampaigns(filteredCampaigns);
+        const newStats = calculateStats(filteredCampaigns);
         console.log('New stats calculated:', newStats);
         setStats(newStats);
       } catch (error) {
@@ -296,7 +312,7 @@ function App() {
     };
 
     fetchData();
-  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL, axiosConfig, calculateStats]);
+  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL, axiosConfig, calculateStats, filterCampaignsByDate]);
 
   // Sort campaigns
   const sortCampaigns = useCallback((data) => {

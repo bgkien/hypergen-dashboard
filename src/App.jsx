@@ -80,7 +80,7 @@ function App() {
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
     const start = new Date();
-    start.setDate(start.getDate() - 30); // Last 30 days by default
+    start.setDate(end.getDate() - 7);
     return {
       startDate: start,
       endDate: end
@@ -115,7 +115,7 @@ function App() {
   }, []);
 
   // Debounce date range change with shorter delay
-  const debouncedDateChange = useCallback((newRange) => {
+  const handleDateChange = useCallback((newRange) => {
     setDateRange(newRange);
   }, []);
 
@@ -257,61 +257,44 @@ function App() {
 
   // Fetch campaign data when workspace changes
   useEffect(() => {
-    if (!selectedWorkspace) {
-      logError('No workspace selected');
-      setCampaigns([]);
-      setLoading(false);
-      return;
-    }
-
+    if (!selectedWorkspace) return;
+    
     const fetchData = async () => {
-      logError('Starting fetchData');
       setLoading(true);
       setError(null);
 
       try {
-        if (!selectedWorkspace?._id) {
-          logError('No workspace ID available', selectedWorkspace);
-          setError('Please select a workspace');
-          return;
-        }
-
         const params = {
-          workspaceId: selectedWorkspace._id, // Changed from workspace_id to workspaceId to match backend
-          status: statusFilter === 'ALL' ? undefined : statusFilter
+          workspaceId: selectedWorkspace._id,
+          status: statusFilter === 'ALL' ? undefined : statusFilter,
+          start_date: dateRange.startDate.toISOString().split('T')[0],
+          end_date: dateRange.endDate.toISOString().split('T')[0]
         };
-
-        // Only add dates if they exist and are valid
-        if (dateRange?.startDate instanceof Date) {
-          params.start_date = dateRange.startDate.toISOString();
-        }
-        if (dateRange?.endDate instanceof Date) {
-          params.end_date = dateRange.endDate.toISOString();
-        }
-
-        logError('Fetching with params:', params);
 
         const response = await axios.get(`${API_BASE_URL}/api/campaign-stats`, {
           ...axiosConfig,
           params
         });
 
-        logError('Campaign Stats Response', response.data);
         setCampaigns(response.data);
-        setError(null);
+        const newStats = calculateStats(response.data);
+        setStats(newStats);
       } catch (error) {
-        logError('Full Fetch Error', error);
         setError(formatErrorMessage(error));
         setCampaigns([]);
+        setStats({
+          totalContacted: 0,
+          totalReplies: 0,
+          positiveReplies: 0,
+          leadRate: '0%'
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    // Set a timeout to prevent too frequent API calls
-    const fetchTimeout = setTimeout(fetchData, 300);
-    return () => clearTimeout(fetchTimeout);
-  }, [selectedWorkspace, statusFilter, dateRange, axiosConfig]);
+    fetchData();
+  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL]);
 
   // Sort campaigns
   const sortCampaigns = useCallback((data) => {
@@ -383,7 +366,7 @@ function App() {
             <input 
               type="date" 
               value={dateRange.startDate.toISOString().split('T')[0]}
-              onChange={(e) => debouncedDateChange({
+              onChange={(e) => handleDateChange({
                 ...dateRange,
                 startDate: new Date(e.target.value)
               })}
@@ -391,7 +374,7 @@ function App() {
             <input 
               type="date"
               value={dateRange.endDate.toISOString().split('T')[0]}
-              onChange={(e) => debouncedDateChange({
+              onChange={(e) => handleDateChange({
                 ...dateRange,
                 endDate: new Date(e.target.value)
               })}

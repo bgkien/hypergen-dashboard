@@ -29,6 +29,12 @@ export default defineConfig(({ mode }) => {
             });
           }
         }
+      },
+      cors: {
+        origin: ['https://www.hypergeniogrowth.com', 'http://localhost:5173'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        credentials: true
       }
     },
     build: {

@@ -100,9 +100,14 @@ function App() {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
-    timeout: 10000, // 10 second timeout
-    withCredentials: false // Explicitly disable credentials
+    withCredentials: true
   }), []);
+
+  // Initialize axios defaults
+  useEffect(() => {
+    axios.defaults.headers.common['Access-Control-Allow-Origin'] = APP_DOMAIN;
+    axios.defaults.withCredentials = true;
+  }, []);
 
   // Debounce workspace change with shorter delay
   const debouncedWorkspaceChange = useCallback((value) => {
@@ -200,13 +205,7 @@ function App() {
     const fetchWorkspaces = async () => {
       try {
         logError('Fetching workspaces from:', `${API_BASE_URL}/api/workspaces`);
-        const response = await axios.get(`${API_BASE_URL}/api/workspaces`, {
-          ...axiosConfig,
-          headers: {
-            ...axiosConfig.headers,
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
+        const response = await axios.get(`${API_BASE_URL}/api/workspaces`, axiosConfig);
         
         if (!response?.data) {
           throw new Error('No data received from workspaces API');

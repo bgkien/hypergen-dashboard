@@ -229,29 +229,32 @@ function App() {
     
     // Calculate stats from filtered data within date range
     const stats = campaigns.reduce((acc, campaign) => {
-      // Check if campaign has any activity in the date range
+      // Get all relevant dates
       const lastActivity = campaign.last_activity_date ? new Date(campaign.last_activity_date) : null;
       const createdAt = new Date(campaign.created_at);
+      const updatedAt = campaign.updated_at ? new Date(campaign.updated_at) : null;
       
-      // Use last activity date if available, otherwise use created_at
-      const campaignDate = lastActivity || createdAt;
+      // A campaign should be counted if ANY of its activity dates fall within the range
+      const dates = [createdAt];
+      if (lastActivity) dates.push(lastActivity);
+      if (updatedAt) dates.push(updatedAt);
       
-      if (isNaN(campaignDate.getTime())) {
-        console.error('Invalid campaign date:', { 
-          campaign: campaign._id,
-          lastActivity,
-          createdAt
-        });
-        return acc;
-      }
+      // Check if any of the dates fall within the range
+      const isInRange = dates.some(date => 
+        !isNaN(date.getTime()) && date >= startDate && date <= endDate
+      );
 
       // Debug log campaign data
       console.log('Processing campaign:', {
         id: campaign._id,
         name: campaign.camp_name,
         status: campaign.status,
-        date: campaignDate.toISOString(),
-        inRange: campaignDate >= startDate && campaignDate <= endDate,
+        dates: {
+          created: createdAt.toISOString(),
+          lastActivity: lastActivity?.toISOString(),
+          updated: updatedAt?.toISOString()
+        },
+        inRange: isInRange,
         stats: {
           contacted: campaign.lead_contacted_count,
           replies: campaign.replied_count,
@@ -259,7 +262,7 @@ function App() {
         }
       });
 
-      if (campaignDate >= startDate && campaignDate <= endDate) {
+      if (isInRange) {
         acc.totalContacted += campaign.lead_contacted_count;
         acc.totalReplies += campaign.replied_count;
         acc.positiveReplies += campaign.positive_reply_count;
@@ -292,7 +295,13 @@ function App() {
       ? `${((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)}%`
       : '0%';
 
-    console.log('Final calculated stats:', stats);
+    console.log('Final calculated stats:', {
+      ...stats,
+      dateRange: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      }
+    });
     return stats;
   }, []);
 

@@ -121,6 +121,7 @@ function App() {
   // Debounce date range change with shorter delay
   const handleDateChange = useCallback((newRange) => {
     console.log('Date range changed:', newRange);
+    
     // Ensure we have valid Date objects
     const startDate = new Date(newRange.startDate);
     const endDate = new Date(newRange.endDate);
@@ -133,7 +134,13 @@ function App() {
       startDate,
       endDate
     });
-  }, []);
+
+    // Recalculate stats with new date range
+    if (campaigns.length > 0) {
+      const newStats = getFilteredStats(campaigns, startDate, endDate);
+      setStats(newStats);
+    }
+  }, [campaigns, getFilteredStats]);
 
   // Filter campaigns by date range
   const filterCampaignsByDate = useCallback((campaigns, startDate, endDate) => {
@@ -145,26 +152,15 @@ function App() {
 
   // Filter campaign data for stats calculation
   const getFilteredStats = useCallback((campaigns, startDate, endDate) => {
-    // Filter campaign data within date range
-    const filteredData = campaigns.map(campaign => {
-      const campaignDate = new Date(campaign.created_at);
+    // Calculate stats from filtered data within date range
+    const stats = campaigns.reduce((acc, campaign) => {
+      // Check if campaign has any activity in the date range
+      const campaignDate = new Date(campaign.last_activity_date || campaign.created_at);
       if (campaignDate >= startDate && campaignDate <= endDate) {
-        return campaign;
+        acc.totalContacted += campaign.lead_contacted_count || 0;
+        acc.totalReplies += campaign.replied_count || 0;
+        acc.positiveReplies += campaign.positive_reply_count || 0;
       }
-      // Return campaign with zero counts if outside date range
-      return {
-        ...campaign,
-        lead_contacted_count: 0,
-        replied_count: 0,
-        positive_reply_count: 0
-      };
-    });
-
-    // Calculate stats from filtered data
-    const stats = filteredData.reduce((acc, campaign) => {
-      acc.totalContacted += campaign.lead_contacted_count || 0;
-      acc.totalReplies += campaign.replied_count || 0;
-      acc.positiveReplies += campaign.positive_reply_count || 0;
       return acc;
     }, {
       totalContacted: 0,
@@ -177,13 +173,16 @@ function App() {
       ? `${((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)}%`
       : '0%';
 
+    console.log('Filtered stats:', { startDate, endDate, stats });
     return stats;
   }, []);
 
   // Update stats when campaigns change
   useEffect(() => {
-    const newStats = getFilteredStats(campaigns, dateRange.startDate, dateRange.endDate);
-    setStats(newStats);
+    if (campaigns.length > 0) {
+      const newStats = getFilteredStats(campaigns, dateRange.startDate, dateRange.endDate);
+      setStats(newStats);
+    }
   }, [campaigns, getFilteredStats, dateRange]);
 
   // Validate MongoDB ObjectId (24-character hex string only)

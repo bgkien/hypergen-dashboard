@@ -139,9 +139,25 @@ function App() {
     });
   }, []);
 
-  // Calculate stats from campaign data
-  const calculateStats = useCallback((campaignData) => {
-    const stats = campaignData.reduce((acc, campaign) => {
+  // Filter campaign data for stats calculation
+  const getFilteredStats = useCallback((campaigns, startDate, endDate) => {
+    // Filter campaign data within date range
+    const filteredData = campaigns.map(campaign => {
+      const campaignDate = new Date(campaign.created_at);
+      if (campaignDate >= startDate && campaignDate <= endDate) {
+        return campaign;
+      }
+      // Return campaign with zero counts if outside date range
+      return {
+        ...campaign,
+        lead_contacted_count: 0,
+        replied_count: 0,
+        positive_reply_count: 0
+      };
+    });
+
+    // Calculate stats from filtered data
+    const stats = filteredData.reduce((acc, campaign) => {
       acc.totalContacted += campaign.lead_contacted_count || 0;
       acc.totalReplies += campaign.replied_count || 0;
       acc.positiveReplies += campaign.positive_reply_count || 0;
@@ -162,9 +178,9 @@ function App() {
 
   // Update stats when campaigns change
   useEffect(() => {
-    const newStats = calculateStats(campaigns);
+    const newStats = getFilteredStats(campaigns, dateRange.startDate, dateRange.endDate);
     setStats(newStats);
-  }, [campaigns, calculateStats]);
+  }, [campaigns, getFilteredStats, dateRange]);
 
   // Validate MongoDB ObjectId (24-character hex string only)
   const isValidObjectId = useCallback((id) => {
@@ -269,9 +285,7 @@ function App() {
       try {
         const params = {
           workspaceId: selectedWorkspace._id,
-          status: statusFilter === 'ALL' ? undefined : statusFilter,
-          start_date: dateRange.startDate.toISOString().split('T')[0],
-          end_date: dateRange.endDate.toISOString().split('T')[0]
+          status: statusFilter === 'ALL' ? undefined : statusFilter
         };
 
         console.log('Fetching with params:', params);
@@ -283,17 +297,15 @@ function App() {
 
         console.log('Campaign data received:', response.data);
         
-        // Filter campaigns by date range
-        const filteredCampaigns = filterCampaignsByDate(
+        // Set all campaigns
+        setCampaigns(response.data);
+
+        // Calculate filtered stats
+        const newStats = getFilteredStats(
           response.data,
           dateRange.startDate,
           dateRange.endDate
         );
-        console.log('Filtered campaigns:', filteredCampaigns);
-        
-        // Update campaigns and recalculate stats
-        setCampaigns(filteredCampaigns);
-        const newStats = calculateStats(filteredCampaigns);
         console.log('New stats calculated:', newStats);
         setStats(newStats);
       } catch (error) {
@@ -312,7 +324,7 @@ function App() {
     };
 
     fetchData();
-  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL, axiosConfig, calculateStats, filterCampaignsByDate]);
+  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL, axiosConfig, getFilteredStats]);
 
   // Sort campaigns
   const sortCampaigns = useCallback((data) => {

@@ -134,13 +134,7 @@ function App() {
       startDate,
       endDate
     });
-
-    // Recalculate stats with new date range
-    if (campaigns.length > 0) {
-      const newStats = getFilteredStats(campaigns, startDate, endDate);
-      setStats(newStats);
-    }
-  }, [campaigns, getFilteredStats]);
+  }, []);
 
   // Filter campaigns by date range
   const filterCampaignsByDate = useCallback((campaigns, startDate, endDate) => {
@@ -177,13 +171,13 @@ function App() {
     return stats;
   }, []);
 
-  // Update stats when campaigns change
+  // Update stats when date range or campaigns change
   useEffect(() => {
-    if (campaigns.length > 0) {
+    if (campaigns.length > 0 && dateRange.startDate && dateRange.endDate) {
       const newStats = getFilteredStats(campaigns, dateRange.startDate, dateRange.endDate);
       setStats(newStats);
     }
-  }, [campaigns, getFilteredStats, dateRange]);
+  }, [campaigns, dateRange, getFilteredStats]);
 
   // Validate MongoDB ObjectId (24-character hex string only)
   const isValidObjectId = useCallback((id) => {

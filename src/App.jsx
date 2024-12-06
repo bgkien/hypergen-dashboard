@@ -151,14 +151,15 @@ function App() {
   // Memoize stats calculation
   const stats = useMemo(() => {
     const totalContacted = campaigns.reduce((sum, camp) => sum + (camp.lead_contacted_count || 0), 0);
+    const totalReplies = campaigns.reduce((sum, camp) => sum + (camp.replied_count || 0), 0);
     const positiveReplies = campaigns.reduce((sum, camp) => sum + (camp.positive_reply_count || 0), 0);
     
     return {
       totalContacted,
-      totalReplies: campaigns.reduce((sum, camp) => sum + (camp.replied_count || 0), 0),
+      totalReplies,
       positiveReplies,
-      activeCampaigns: campaigns.filter(camp => camp.status === 'ACTIVE').length,
-      leadRate: totalContacted ? ((positiveReplies / totalContacted) * 100).toFixed(1) + '%' : '0%'
+      leadRate: totalContacted ? ((positiveReplies / totalContacted) * 100).toFixed(1) + '%' : '0%',
+      replyRate: totalContacted ? ((totalReplies / totalContacted) * 100).toFixed(1) + '%' : '0%'
     };
   }, [campaigns]);
 
@@ -245,10 +246,10 @@ function App() {
       <main className="main">
         <div className="stats-summary">
           <SummaryCard title="Total Contacted" value={stats.totalContacted} />
-          <SummaryCard title="Total Replies in Date Range" value={stats.totalReplies} />
-          <SummaryCard title="Positive Replies in Date Range" value={stats.positiveReplies} />
+          <SummaryCard title="Total Replies" value={stats.totalReplies} />
+          <SummaryCard title="Positive Replies" value={stats.positiveReplies} />
+          <SummaryCard title="Reply Rate" value={stats.replyRate} />
           <SummaryCard title="Lead Rate" value={stats.leadRate} />
-          <SummaryCard title="Active Campaigns in Date Range" value={stats.activeCampaigns} />
         </div>
 
         <div className="table-container">

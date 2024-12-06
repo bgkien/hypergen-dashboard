@@ -55,7 +55,10 @@ const SummaryCard = React.memo(({ title, value }) => {
 function App() {
   const [campaigns, setCampaigns] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState('');
+  const [selectedWorkspace, setSelectedWorkspace] = useState(() => {
+    const saved = localStorage.getItem('selectedWorkspace');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -77,11 +80,10 @@ function App() {
   const axiosConfig = useMemo(() => ({
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Origin': APP_DOMAIN
+      'Accept': 'application/json'
     },
     timeout: 10000 // 10 second timeout
-  }), [APP_DOMAIN]);
+  }), []);
 
   // Debounce workspace change with shorter delay
   const debouncedWorkspaceChange = useCallback((value) => {
@@ -382,6 +384,12 @@ function App() {
 
     return () => clearTimeout(fetchTimeout);
   }, [selectedWorkspace, statusFilter, dateRange]);
+
+  useEffect(() => {
+    if (selectedWorkspace) {
+      localStorage.setItem('selectedWorkspace', JSON.stringify(selectedWorkspace));
+    }
+  }, [selectedWorkspace]);
 
   const handleSort = useCallback((field) => {
     setSortBy(prevSort => {

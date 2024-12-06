@@ -116,32 +116,28 @@ function App() {
 
   // Debounce date range change with shorter delay
   const handleDateChange = useCallback((newRange) => {
-    setDateRange(newRange);
+    console.log('Date range changed:', newRange);
+    // Ensure we have valid Date objects
+    const startDate = new Date(newRange.startDate);
+    const endDate = new Date(newRange.endDate);
+    
+    // Set time to start/end of day
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    
+    setDateRange({
+      startDate,
+      endDate
+    });
   }, []);
 
-  // Calculate stats from campaigns
+  // Calculate stats from campaign data
   const calculateStats = useCallback((campaignData) => {
-    if (!Array.isArray(campaignData)) {
-      logError('Invalid campaign data for stats calculation', campaignData);
-      return {
-        totalContacted: 0,
-        totalReplies: 0,
-        positiveReplies: 0,
-        leadRate: '0%'
-      };
-    }
-
     const stats = campaignData.reduce((acc, campaign) => {
-      // Ensure numeric values
-      const contacted = Number(campaign.lead_contacted_count) || 0;
-      const replies = Number(campaign.replied_count) || 0;
-      const positiveReplies = Number(campaign.positive_reply_count) || 0;
-
-      return {
-        totalContacted: acc.totalContacted + contacted,
-        totalReplies: acc.totalReplies + replies,
-        positiveReplies: acc.positiveReplies + positiveReplies,
-      };
+      acc.totalContacted += campaign.lead_contacted_count || 0;
+      acc.totalReplies += campaign.replied_count || 0;
+      acc.positiveReplies += campaign.positive_reply_count || 0;
+      return acc;
     }, {
       totalContacted: 0,
       totalReplies: 0,
@@ -149,12 +145,11 @@ function App() {
     });
 
     // Calculate lead rate
-    const leadRate = stats.totalContacted > 0
-      ? ((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)
-      : 0;
+    stats.leadRate = stats.totalContacted > 0 
+      ? `${((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)}%`
+      : '0%';
 
-    logError('Calculated stats:', { ...stats, leadRate: `${leadRate}%` });
-    return { ...stats, leadRate: `${leadRate}%` };
+    return stats;
   }, []);
 
   // Update stats when campaigns change
@@ -255,7 +250,7 @@ function App() {
     }
   }, []);
 
-  // Fetch campaign data when workspace changes
+  // Fetch campaign data when filters change
   useEffect(() => {
     if (!selectedWorkspace) return;
     
@@ -271,15 +266,22 @@ function App() {
           end_date: dateRange.endDate.toISOString().split('T')[0]
         };
 
+        console.log('Fetching with params:', params);
+
         const response = await axios.get(`${API_BASE_URL}/api/campaign-stats`, {
           ...axiosConfig,
           params
         });
 
+        console.log('Campaign data received:', response.data);
+        
+        // Update campaigns and recalculate stats
         setCampaigns(response.data);
         const newStats = calculateStats(response.data);
+        console.log('New stats calculated:', newStats);
         setStats(newStats);
       } catch (error) {
+        console.error('Error fetching campaign data:', error);
         setError(formatErrorMessage(error));
         setCampaigns([]);
         setStats({
@@ -294,7 +296,7 @@ function App() {
     };
 
     fetchData();
-  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL]);
+  }, [selectedWorkspace, statusFilter, dateRange, API_BASE_URL, axiosConfig, calculateStats]);
 
   // Sort campaigns
   const sortCampaigns = useCallback((data) => {

@@ -6,7 +6,7 @@
       "use": "@vercel/static-build",
       "config": { 
         "distDir": "dist",
-        "buildCommand": "npm run build"
+        "buildCommand": "npm ci && npm run clean:install && npm run build"
       }
     }
   ],
@@ -19,16 +19,5 @@
   "env": {
     "VITE_API_BASE_URL": "https://pipl-ai-dashboard-f2a0f689cbf5.herokuapp.com",
     "VITE_APP_DOMAIN": "https://hypergeniogrowth.com"
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Access-Control-Allow-Origin", "value": "https://hypergeniogrowth.com" }
-      ]
-    }
-  ]
+  }
 }

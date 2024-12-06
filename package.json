@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "clean:install": "rm -rf node_modules && npm install",
     "preview": "vite preview",
     "vercel-build": "npm run build"
   },

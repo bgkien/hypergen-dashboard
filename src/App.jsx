@@ -64,9 +64,14 @@ function App() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30); // Last 30 days by default
+    return {
+      startDate: start,
+      endDate: end
+    };
   });
 
   const [stats, setStats] = useState({
@@ -212,10 +217,16 @@ function App() {
       try {
         const params = {
           workspace_id: selectedWorkspace._id,
-          status: statusFilter === 'ALL' ? undefined : statusFilter,
-          start_date: dateRange?.startDate?.toISOString(),
-          end_date: dateRange?.endDate?.toISOString()
+          status: statusFilter === 'ALL' ? undefined : statusFilter
         };
+
+        // Only add dates if they exist and are valid
+        if (dateRange?.startDate instanceof Date) {
+          params.start_date = dateRange.startDate.toISOString();
+        }
+        if (dateRange?.endDate instanceof Date) {
+          params.end_date = dateRange.endDate.toISOString();
+        }
 
         const response = await axios.get(`${API_BASE_URL}/api/campaign-stats`, {
           ...axiosConfig,
@@ -342,18 +353,18 @@ function App() {
           <div className="date-range">
             <input 
               type="date" 
-              value={dateRange.startDate} 
+              value={dateRange.startDate.toISOString().split('T')[0]} 
               onChange={(e) => debouncedDateChange({
                 ...dateRange, 
-                startDate: e.target.value
+                startDate: new Date(e.target.value)
               })}
             />
             <input 
               type="date" 
-              value={dateRange.endDate} 
+              value={dateRange.endDate.toISOString().split('T')[0]} 
               onChange={(e) => debouncedDateChange({
                 ...dateRange, 
-                endDate: e.target.value
+                endDate: new Date(e.target.value)
               })}
             />
           </div>

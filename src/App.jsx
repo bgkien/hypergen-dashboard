@@ -34,25 +34,38 @@ console.log('API Base URL:', API_BASE_URL || '(using proxy)');
 console.log('App Domain:', APP_DOMAIN);
 
 // Memoized table row component
-const TableRow = React.memo(({ campaign }) => (
-  <tr>
-    <td>{campaign.camp_name}</td>
-    <td>
-      <span className="status-badge" data-status={campaign.status}>
-        {campaign.status}
-      </span>
-    </td>
-    <td>{(campaign.lead_count || 0).toLocaleString()}</td>
-    <td>{(campaign.completed_lead_count || 0).toLocaleString()}</td>
-    <td>{(campaign.lead_contacted_count || 0).toLocaleString()}</td>
-    <td>{(campaign.sent_count || 0).toLocaleString()}</td>
-    <td>{(campaign.replied_count || 0).toLocaleString()}</td>
-    <td>{(campaign.positive_reply_count || 0).toLocaleString()}</td>
-    <td>{(campaign.bounced_count || 0).toLocaleString()}</td>
-    <td>{(campaign.unsubscribed_count || 0).toLocaleString()}</td>
-    <td>{new Date(campaign.created_at).toLocaleDateString()}</td>
-  </tr>
-));
+const TableRow = React.memo(({ campaign }) => {
+  // Debug log for campaign data in row
+  console.log('Rendering campaign row:', {
+    id: campaign._id,
+    name: campaign.camp_name,
+    stats: {
+      contacted: campaign.lead_contacted_count,
+      replies: campaign.replied_count,
+      positive: campaign.positive_reply_count
+    }
+  });
+
+  return (
+    <tr>
+      <td>{campaign.camp_name}</td>
+      <td>
+        <span className="status-badge" data-status={campaign.status}>
+          {campaign.status}
+        </span>
+      </td>
+      <td>{campaign.lead_count.toLocaleString()}</td>
+      <td>{campaign.completed_lead_count.toLocaleString()}</td>
+      <td>{campaign.lead_contacted_count.toLocaleString()}</td>
+      <td>{campaign.sent_count.toLocaleString()}</td>
+      <td>{campaign.replied_count.toLocaleString()}</td>
+      <td>{campaign.positive_reply_count.toLocaleString()}</td>
+      <td>{campaign.bounced_count.toLocaleString()}</td>
+      <td>{campaign.unsubscribed_count.toLocaleString()}</td>
+      <td>{new Date(campaign.created_at).toLocaleDateString()}</td>
+    </tr>
+  );
+});
 
 // Memoized summary card component
 const SummaryCard = React.memo(({ title, value }) => {
@@ -153,6 +166,43 @@ function App() {
     });
   }, []);
 
+  // Fetch campaign data
+  const fetchCampaigns = useCallback(async (workspaceId) => {
+    if (!workspaceId) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching campaigns for workspace:', workspaceId);
+      const response = await axios.get(`${API_BASE_URL}/api/campaigns`, {
+        params: { workspaceId },
+        ...axiosConfig
+      });
+      
+      // Transform and validate campaign data
+      const transformedCampaigns = response.data.map(campaign => ({
+        ...campaign,
+        lead_contacted_count: parseInt(campaign.lead_contacted_count) || 0,
+        replied_count: parseInt(campaign.replied_count) || 0,
+        positive_reply_count: parseInt(campaign.positive_reply_count) || 0,
+        lead_count: parseInt(campaign.lead_count) || 0,
+        completed_lead_count: parseInt(campaign.completed_lead_count) || 0,
+        sent_count: parseInt(campaign.sent_count) || 0,
+        bounced_count: parseInt(campaign.bounced_count) || 0,
+        unsubscribed_count: parseInt(campaign.unsubscribed_count) || 0
+      }));
+
+      console.log('Campaign data received:', transformedCampaigns);
+      setCampaigns(transformedCampaigns);
+    } catch (err) {
+      console.error('Error fetching campaigns:', err);
+      setError(formatErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [axiosConfig]);
+
   // Filter campaigns by date range
   const filterCampaignsByDate = useCallback((campaigns, startDate, endDate) => {
     return campaigns.filter(campaign => {
@@ -177,17 +227,6 @@ function App() {
     });
     console.log('Number of campaigns:', campaigns.length);
     
-    // Validate inputs
-    if (!Array.isArray(campaigns) || !startDate || !endDate) {
-      console.error('Invalid inputs for getFilteredStats:', { campaigns, startDate, endDate });
-      return {
-        totalContacted: 0,
-        totalReplies: 0,
-        positiveReplies: 0,
-        leadRate: '0%'
-      };
-    }
-
     // Calculate stats from filtered data within date range
     const stats = campaigns.reduce((acc, campaign) => {
       // Check if campaign has any activity in the date range
@@ -207,43 +246,34 @@ function App() {
       }
 
       // Debug log campaign data
-      console.log('Raw campaign data:', {
+      console.log('Processing campaign:', {
         id: campaign._id,
         name: campaign.camp_name,
         status: campaign.status,
+        date: campaignDate.toISOString(),
+        inRange: campaignDate >= startDate && campaignDate <= endDate,
         stats: {
-          lead_count: campaign.lead_count,
-          completed_lead_count: campaign.completed_lead_count,
-          lead_contacted_count: campaign.lead_contacted_count,
-          sent_count: campaign.sent_count,
-          replied_count: campaign.replied_count,
-          positive_reply_count: campaign.positive_reply_count,
-          bounced_count: campaign.bounced_count,
-          unsubscribed_count: campaign.unsubscribed_count
+          contacted: campaign.lead_contacted_count,
+          replies: campaign.replied_count,
+          positive: campaign.positive_reply_count
         }
       });
 
       if (campaignDate >= startDate && campaignDate <= endDate) {
-        // Extract stats with proper type conversion and null checks
-        const contacted = parseInt(campaign.lead_contacted_count) || 0;
-        const replies = parseInt(campaign.replied_count) || 0;
-        const positive = parseInt(campaign.positive_reply_count) || 0;
+        acc.totalContacted += campaign.lead_contacted_count;
+        acc.totalReplies += campaign.replied_count;
+        acc.positiveReplies += campaign.positive_reply_count;
 
-        // Update accumulator
-        acc.totalContacted += contacted;
-        acc.totalReplies += replies;
-        acc.positiveReplies += positive;
-
-        // Log individual campaign contribution
+        // Log contribution
         console.log('Adding stats from campaign:', {
           name: campaign.camp_name,
           status: campaign.status,
-          stats: {
-            contacted,
-            replies,
-            positive
+          contribution: {
+            contacted: campaign.lead_contacted_count,
+            replies: campaign.replied_count,
+            positive: campaign.positive_reply_count
           },
-          runningTotal: {
+          newTotals: {
             totalContacted: acc.totalContacted,
             totalReplies: acc.totalReplies,
             positiveReplies: acc.positiveReplies
@@ -262,13 +292,7 @@ function App() {
       ? `${((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)}%`
       : '0%';
 
-    console.log('Final calculated stats:', {
-      ...stats,
-      dateRange: {
-        start: startDate.toISOString(),
-        end: endDate.toISOString()
-      }
-    });
+    console.log('Final calculated stats:', stats);
     return stats;
   }, []);
 

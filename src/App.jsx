@@ -163,7 +163,10 @@ function App() {
 
   // Filter campaign data for stats calculation
   const getFilteredStats = useCallback((campaigns, startDate, endDate) => {
-    console.log('Calculating stats for range:', { startDate, endDate });
+    console.log('Calculating stats for range:', { 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
     console.log('Number of campaigns:', campaigns.length);
     
     // Validate inputs
@@ -180,17 +183,52 @@ function App() {
     // Calculate stats from filtered data within date range
     const stats = campaigns.reduce((acc, campaign) => {
       // Check if campaign has any activity in the date range
-      const campaignDate = new Date(campaign.last_activity_date || campaign.created_at);
+      const lastActivity = campaign.last_activity_date ? new Date(campaign.last_activity_date) : null;
+      const createdAt = new Date(campaign.created_at);
+      
+      // Use last activity date if available, otherwise use created_at
+      const campaignDate = lastActivity || createdAt;
       
       if (isNaN(campaignDate.getTime())) {
-        console.error('Invalid campaign date:', { campaign, campaignDate });
+        console.error('Invalid campaign date:', { 
+          campaign: campaign._id,
+          lastActivity,
+          createdAt
+        });
         return acc;
       }
 
+      // Debug log for each campaign
+      console.log('Campaign date check:', {
+        campaignId: campaign._id,
+        campaignName: campaign.camp_name,
+        campaignDate: campaignDate.toISOString(),
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isInRange: campaignDate >= startDate && campaignDate <= endDate,
+        stats: {
+          contacted: campaign.lead_contacted_count || 0,
+          replies: campaign.replied_count || 0,
+          positiveReplies: campaign.positive_reply_count || 0
+        }
+      });
+
       if (campaignDate >= startDate && campaignDate <= endDate) {
-        acc.totalContacted += campaign.lead_contacted_count || 0;
-        acc.totalReplies += campaign.replied_count || 0;
-        acc.positiveReplies += campaign.positive_reply_count || 0;
+        const contacted = campaign.lead_contacted_count || 0;
+        const replies = campaign.replied_count || 0;
+        const positive = campaign.positive_reply_count || 0;
+
+        acc.totalContacted += contacted;
+        acc.totalReplies += replies;
+        acc.positiveReplies += positive;
+
+        // Log individual campaign contribution
+        console.log('Adding stats from campaign:', {
+          name: campaign.camp_name,
+          contacted,
+          replies,
+          positive
+        });
       }
       return acc;
     }, {
@@ -204,7 +242,13 @@ function App() {
       ? `${((stats.positiveReplies / stats.totalContacted) * 100).toFixed(1)}%`
       : '0%';
 
-    console.log('Calculated stats:', stats);
+    console.log('Final calculated stats:', {
+      ...stats,
+      dateRange: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      }
+    });
     return stats;
   }, []);
 
@@ -212,7 +256,10 @@ function App() {
   useEffect(() => {
     console.log('Stats effect triggered:', { 
       campaignsLength: campaigns.length,
-      dateRange
+      dateRange: {
+        start: dateRange.startDate?.toISOString(),
+        end: dateRange.endDate?.toISOString()
+      }
     });
 
     if (campaigns.length > 0 && dateRange.startDate && dateRange.endDate) {

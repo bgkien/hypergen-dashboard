@@ -357,43 +357,6 @@ function App() {
       </header>
 
       <main className="main">
-        <div className="stats-summary">
-          <div className="summary-cards">
-            <div className="card">
-              <h3>Total Contacted</h3>
-              <div className="metric">{stats.totalContacted.toLocaleString()}</div>
-            </div>
-            <div className="card">
-              <h3>Total Replies</h3>
-              <div className="metric">{stats.totalReplies.toLocaleString()}</div>
-            </div>
-            <div className="card">
-              <h3>Positive Replies</h3>
-              <div className="metric">{stats.positiveReplies.toLocaleString()}</div>
-            </div>
-            <div className="card">
-              <h3>Lead Rate</h3>
-              <div className="metric">{stats.leadRate}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Comprehensive Debug Information */}
-        <div style={{color: 'red', fontSize: '12px', border: '1px solid red', padding: '10px'}}>
-          <h4>Debug Information</h4>
-          <p>API Base URL: {API_BASE_URL}</p>
-          <p>Campaigns Count: {campaigns.length}</p>
-          <p>Global Error Log Length: {window.globalErrorLog.length}</p>
-          <details>
-            <summary>Global Error Log</summary>
-            <pre>{JSON.stringify(window.globalErrorLog, null, 2)}</pre>
-          </details>
-          <details>
-            <summary>Raw Campaigns</summary>
-            <pre>{JSON.stringify(campaigns, null, 2)}</pre>
-          </details>
-        </div>
-
         <div className="filters">
           <select 
             value={selectedWorkspace?._id} 
@@ -408,32 +371,54 @@ function App() {
 
           <select 
             value={statusFilter} 
-            onChange={(e) => debouncedStatusChange(e.target.value)}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
+            <option value="PAUSED">Paused</option>
             <option value="COMPLETED">Completed</option>
           </select>
 
           <div className="date-range">
             <input 
               type="date" 
-              value={dateRange.startDate.toISOString().split('T')[0]} 
+              value={dateRange.startDate.toISOString().split('T')[0]}
               onChange={(e) => debouncedDateChange({
-                ...dateRange, 
+                ...dateRange,
                 startDate: new Date(e.target.value)
               })}
             />
             <input 
-              type="date" 
-              value={dateRange.endDate.toISOString().split('T')[0]} 
+              type="date"
+              value={dateRange.endDate.toISOString().split('T')[0]}
               onChange={(e) => debouncedDateChange({
-                ...dateRange, 
+                ...dateRange,
                 endDate: new Date(e.target.value)
               })}
             />
           </div>
         </div>
+
+        <div className="summary-cards">
+          <div className="card">
+            <h3>Total Contacted</h3>
+            <div className="metric">{stats.totalContacted.toLocaleString()}</div>
+          </div>
+          <div className="card">
+            <h3>Total Replies</h3>
+            <div className="metric">{stats.totalReplies.toLocaleString()}</div>
+          </div>
+          <div className="card">
+            <h3>Positive Replies</h3>
+            <div className="metric">{stats.positiveReplies.toLocaleString()}</div>
+          </div>
+          <div className="card">
+            <h3>Lead Rate</h3>
+            <div className="metric">{stats.leadRate}</div>
+          </div>
+        </div>
+
+        {error && <div className="error-message">{error}</div>}
 
         <div className="table-container">
           {loading ? (

@@ -37,6 +37,7 @@ const SummaryCard = React.memo(({ title, value }) => (
 
 function App() {
   const [campaigns, setCampaigns] = useState([]);
+  const [previousCampaigns, setPreviousCampaigns] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [loading, setLoading] = useState(true);
@@ -104,25 +105,47 @@ function App() {
   const fetchCampaigns = useCallback(async () => {
     if (!selectedWorkspace) return;
     setLoading(true);
-    setError(null);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/campaign-stats`, {
-        params: {
-          workspaceId: selectedWorkspace,
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          status: statusFilter !== 'ALL' ? statusFilter : undefined
-        },
-        ...axiosConfig
-      });
-      setCampaigns(response.data);
-    } catch (err) {
-      console.error('Error fetching campaigns:', err);
-      setError(err.response?.data?.error || 'Failed to fetch campaigns');
-    } finally {
-      setLoading(false);
+      // Calculate previous period dates
+      const currentStart = new Date(dateRange.startDate);
+      const currentEnd = new Date(dateRange.endDate);
+      const periodLength = currentEnd - currentStart;
+      const previousStart = new Date(currentStart - periodLength);
+      const previousEnd = new Date(currentStart);
+
+      // Format dates for API
+      const formatDate = (date) => date.toISOString().split('T')[0];
+
+      // Fetch both current and previous period data
+      const [currentResponse, previousResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/campaign-stats`, {
+          params: {
+            workspaceId: selectedWorkspace,
+            startDate: formatDate(currentStart),
+            endDate: formatDate(currentEnd),
+            status: statusFilter !== 'ALL' ? statusFilter : undefined
+          },
+          ...axiosConfig
+        }),
+        axios.get(`${API_BASE_URL}/api/campaign-stats`, {
+          params: {
+            workspaceId: selectedWorkspace,
+            startDate: formatDate(previousStart),
+            endDate: formatDate(previousEnd),
+            status: statusFilter !== 'ALL' ? statusFilter : undefined
+          },
+          ...axiosConfig
+        })
+      ]);
+
+      setCampaigns(currentResponse.data);
+      setPreviousCampaigns(previousResponse.data);
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      setError(error.message);
     }
-  }, [selectedWorkspace, dateRange, statusFilter, API_BASE_URL]);
+    setLoading(false);
+  }, [selectedWorkspace, dateRange, API_BASE_URL]);
 
   const sortCampaigns = useCallback((data) => {
     return [...data].sort((a, b) => {
@@ -148,20 +171,61 @@ function App() {
     });
   }, [sortBy, sortOrder]);
 
+  // Helper function to calculate percentage change
+  const calculateChange = (current, previous) => {
+    if (!previous) return 0;
+    const change = ((current - previous) / previous * 100);
+    return change.toFixed(1);
+  };
+
+  // Helper function to format change for display
+  const formatChange = (change) => {
+    return `${change}%`;
+  };
+
+  // Helper function to format change for display with color
+  const formatChangeWithColor = (change, value) => {
+    const color = value >= 0 ? '#22c55e' : '#ef4444'; // green for positive, red for negative
+    return `<span style="color: ${color}">${value >= 0 ? 'up' : 'down'} ${formatChange(Math.abs(value))}</span>`;
+  };
+
   // Memoize stats calculation
   const stats = useMemo(() => {
+    // Calculate current period stats
     const totalContacted = campaigns.reduce((sum, camp) => sum + (camp.lead_contacted_count || 0), 0);
     const totalReplies = campaigns.reduce((sum, camp) => sum + (camp.replied_count || 0), 0);
     const positiveReplies = campaigns.reduce((sum, camp) => sum + (camp.positive_reply_count || 0), 0);
+    
+    // Calculate previous period stats
+    const prevTotalContacted = previousCampaigns.reduce((sum, camp) => sum + (camp.lead_contacted_count || 0), 0);
+    const prevTotalReplies = previousCampaigns.reduce((sum, camp) => sum + (camp.replied_count || 0), 0);
+    const prevPositiveReplies = previousCampaigns.reduce((sum, camp) => sum + (camp.positive_reply_count || 0), 0);
+    
+    // Calculate changes
+    const contactedChange = calculateChange(totalContacted, prevTotalContacted);
+    
+    const currentReplyRate = totalContacted ? (totalReplies / totalContacted * 100) : 0;
+    const prevReplyRate = prevTotalContacted ? (prevTotalReplies / prevTotalContacted * 100) : 0;
+    const replyRateChange = calculateChange(currentReplyRate, prevReplyRate);
+    
+    const currentLeadRate = totalContacted ? (positiveReplies / totalContacted * 100) : 0;
+    const prevLeadRate = prevTotalContacted ? (prevPositiveReplies / prevTotalContacted * 100) : 0;
+    const leadRateChange = calculateChange(currentLeadRate, prevLeadRate);
+
+    // Generate summary text with explicit sign handling and colors
+    const summaryText = `Compared to previous period: ${formatChangeWithColor(contactedChange, contactedChange)} in total contacts prospected, 
+      reply rate ${formatChangeWithColor(replyRateChange, replyRateChange)}, 
+      lead rate ${formatChangeWithColor(leadRateChange, leadRateChange)}.`;
     
     return {
       totalContacted,
       totalReplies,
       positiveReplies,
-      leadRate: totalContacted ? ((positiveReplies / totalContacted) * 100).toFixed(1) + '%' : '0%',
-      replyRate: totalContacted ? ((totalReplies / totalContacted) * 100).toFixed(1) + '%' : '0%'
+      leadRate: currentLeadRate.toFixed(1) + '%',
+      replyRate: currentReplyRate.toFixed(1) + '%',
+      summaryText
     };
-  }, [campaigns]);
+  }, [campaigns, previousCampaigns]);
 
   useEffect(() => {
     fetchWorkspaces();
@@ -244,12 +308,17 @@ function App() {
       </header>
       
       <main className="main">
-        <div className="stats-summary">
-          <SummaryCard title="Total Contacted" value={stats.totalContacted} />
-          <SummaryCard title="Total Replies" value={stats.totalReplies} />
-          <SummaryCard title="Positive Replies" value={stats.positiveReplies} />
-          <SummaryCard title="Reply Rate" value={stats.replyRate} />
-          <SummaryCard title="Lead Rate" value={stats.leadRate} />
+        <div className="stats-container">
+          <div className="stats-summary">
+            <SummaryCard title="Total Contacted" value={stats.totalContacted} />
+            <SummaryCard title="Total Replies" value={stats.totalReplies} />
+            <SummaryCard title="Positive Replies" value={stats.positiveReplies} />
+            <SummaryCard title="Reply Rate" value={stats.replyRate} />
+            <SummaryCard title="Lead Rate" value={stats.leadRate} />
+          </div>
+          <div className="stats-text-summary">
+            <p dangerouslySetInnerHTML={{ __html: stats.summaryText }}></p>
+          </div>
         </div>
 
         <div className="table-container">

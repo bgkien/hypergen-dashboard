@@ -15,9 +15,9 @@ const TableRow = React.memo(({ campaign }) => (
         {campaign.status}
       </span>
     </td>
-    <td>{(campaign.lead_count || 0).toLocaleString()}</td>
-    <td>{(campaign.completed_lead_count || 0).toLocaleString()}</td>
     <td>{(campaign.lead_contacted_count || 0).toLocaleString()}</td>
+    <td>{(campaign.completed_lead_count || 0).toLocaleString()}</td>
+    <td>{(campaign.lead_count || 0).toLocaleString()}</td>
     <td>{(campaign.sent_count || 0).toLocaleString()}</td>
     <td>{(campaign.replied_count || 0).toLocaleString()}</td>
     <td>{(campaign.positive_reply_count || 0).toLocaleString()}</td>
@@ -262,14 +262,14 @@ function App() {
                     Campaign Name
                   </th>
                   <th>Status</th>
-                  <th onClick={() => handleSort('lead_count')} className="sortable" data-sort={sortBy === 'lead_count' ? sortOrder : ''}>
-                    Leads
+                  <th onClick={() => handleSort('lead_contacted_count')} className="sortable" data-sort={sortBy === 'lead_contacted_count' ? sortOrder : ''}>
+                    Contacted
                   </th>
                   <th onClick={() => handleSort('completed_lead_count')} className="sortable" data-sort={sortBy === 'completed_lead_count' ? sortOrder : ''}>
                     Completed
                   </th>
-                  <th onClick={() => handleSort('lead_contacted_count')} className="sortable" data-sort={sortBy === 'lead_contacted_count' ? sortOrder : ''}>
-                    Contacted
+                  <th onClick={() => handleSort('lead_count')} className="sortable" data-sort={sortBy === 'lead_count' ? sortOrder : ''}>
+                    Leads
                   </th>
                   <th onClick={() => handleSort('sent_count')} className="sortable" data-sort={sortBy === 'sent_count' ? sortOrder : ''}>
                     Sent

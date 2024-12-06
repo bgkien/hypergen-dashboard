@@ -161,6 +161,14 @@ function App() {
     });
   }, []);
 
+  // Filter campaigns by status
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(campaign => {
+      const matchesStatus = statusFilter === 'ALL' || campaign.status === statusFilter;
+      return matchesStatus;
+    });
+  }, [campaigns, statusFilter]);
+
   // Filter campaign data for stats calculation
   const getFilteredStats = useCallback((campaigns, startDate, endDate) => {
     console.log('Calculating stats for range:', { 
@@ -213,17 +221,6 @@ function App() {
           bounced_count: campaign.bounced_count,
           unsubscribed_count: campaign.unsubscribed_count
         }
-      });
-
-      // Debug log for each campaign
-      console.log('Campaign date check:', {
-        campaignId: campaign._id,
-        campaignName: campaign.camp_name,
-        status: campaign.status,
-        campaignDate: campaignDate.toISOString(),
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        isInRange: campaignDate >= startDate && campaignDate <= endDate
       });
 
       if (campaignDate >= startDate && campaignDate <= endDate) {
@@ -286,6 +283,7 @@ function App() {
     });
 
     if (campaigns.length > 0 && dateRange.startDate && dateRange.endDate) {
+      // Calculate stats based on all campaigns, not just filtered ones
       const newStats = getFilteredStats(campaigns, dateRange.startDate, dateRange.endDate);
       console.log('Setting new stats:', newStats);
       setStats(newStats);
@@ -585,7 +583,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map(campaign => (
+                {filteredCampaigns.map(campaign => (
                   <TableRow key={campaign._id} campaign={campaign} />
                 ))}
               </tbody>

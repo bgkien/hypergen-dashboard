@@ -10,8 +10,11 @@
       }
     }
   ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ],
   "env": {
     "VITE_API_BASE_URL": "https://pipl-ai-dashboard-f2a0f689cbf5.herokuapp.com",

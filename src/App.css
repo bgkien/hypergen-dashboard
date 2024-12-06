@@ -97,6 +97,13 @@
   line-height: 1.4;
 }
 
+.summary-text {
+  white-space: pre-line;
+  line-height: 1.5;
+  margin-top: 1rem;
+  font-size: 1.1rem;
+}
+
 .summary-card {
   background: white;
   padding: 15px;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
@@ -35,7 +36,10 @@ const SummaryCard = React.memo(({ title, value }) => (
   </div>
 ));
 
-function App() {
+function Dashboard() {
+  const { workspaceName } = useParams();
+  const navigate = useNavigate();
+  
   const [campaigns, setCampaigns] = useState([]);
   const [previousCampaigns, setPreviousCampaigns] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
@@ -50,14 +54,15 @@ function App() {
     endDate: new Date().toISOString().split('T')[0]
   });
 
-  const axiosConfig = {
+  // Add axios config at the top of the Dashboard component
+  const axiosConfig = useMemo(() => ({
     headers: {
       'Content-Type': 'application/json',
-      'Origin': APP_DOMAIN,
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'Origin': APP_DOMAIN
     },
     withCredentials: true
-  };
+  }), []);
 
   // Debounce workspace change with shorter delay
   const debouncedWorkspaceChange = useCallback((value) => {
@@ -77,35 +82,32 @@ function App() {
   // Fetch workspaces
   const fetchWorkspaces = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
+      console.log('Fetching workspaces from:', `${API_BASE_URL}/api/workspaces`);
       const response = await axios.get(`${API_BASE_URL}/api/workspaces`, axiosConfig);
-      const workspaceData = response.data;
+      console.log('Workspaces response:', response.data);
+      setWorkspaces(response.data);
       
-      if (!Array.isArray(workspaceData)) {
-        throw new Error('Invalid workspace data received');
-      }
-      
-      setWorkspaces(workspaceData);
-      
-      // Set default workspace if none selected
-      if (workspaceData.length > 0 && !selectedWorkspace) {
-        setSelectedWorkspace(workspaceData[0]._id);
+      // If URL has workspace name, find and select it
+      if (workspaceName && response.data.length > 0) {
+        const workspace = response.data.find(w => w.name.toLowerCase() === workspaceName.toLowerCase());
+        if (workspace) {
+          setSelectedWorkspace(workspace._id);
+        }
       }
     } catch (error) {
       console.error('Error fetching workspaces:', error);
-      setError(error.response?.data?.details || error.message);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
-  }, [selectedWorkspace]);
+  }, [API_BASE_URL, axiosConfig, workspaceName]);
 
   // Fetch campaign data
   const fetchCampaigns = useCallback(async () => {
     if (!selectedWorkspace) return;
     setLoading(true);
     try {
+      console.log('Fetching campaigns for workspace:', selectedWorkspace);
       // Calculate previous period dates
       const currentStart = new Date(dateRange.startDate);
       const currentEnd = new Date(dateRange.endDate);
@@ -115,6 +117,9 @@ function App() {
 
       // Format dates for API
       const formatDate = (date) => date.toISOString().split('T')[0];
+
+      console.log('Current period:', formatDate(currentStart), 'to', formatDate(currentEnd));
+      console.log('Previous period:', formatDate(previousStart), 'to', formatDate(previousEnd));
 
       // Fetch both current and previous period data
       const [currentResponse, previousResponse] = await Promise.all([
@@ -138,14 +143,18 @@ function App() {
         })
       ]);
 
+      console.log('Current period data:', currentResponse.data);
+      console.log('Previous period data:', previousResponse.data);
+
       setCampaigns(currentResponse.data);
       setPreviousCampaigns(previousResponse.data);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       setError(error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [selectedWorkspace, dateRange, API_BASE_URL]);
+  }, [selectedWorkspace, dateRange, statusFilter, API_BASE_URL, axiosConfig]);
 
   const sortCampaigns = useCallback((data) => {
     return [...data].sort((a, b) => {
@@ -208,37 +217,67 @@ function App() {
     const prevReplyRate = prevTotalContacted ? (prevTotalReplies / prevTotalContacted * 100) : 0;
     const replyRateChange = calculateChange(currentReplyRate, prevReplyRate);
     
-    const currentLeadRate = totalContacted ? (positiveReplies / totalContacted * 100) : 0;
-    const prevLeadRate = prevTotalContacted ? (prevPositiveReplies / prevTotalContacted * 100) : 0;
-    const leadRateChange = calculateChange(currentLeadRate, prevLeadRate);
+    const positiveRepliesChange = calculateChange(positiveReplies, prevPositiveReplies);
 
-    // Generate summary text with explicit sign handling and colors
-    const summaryText = `Compared to previous period: ${formatChangeWithColor(contactedChange, contactedChange)} in total contacts prospected, 
-      reply rate ${formatChangeWithColor(replyRateChange, replyRateChange)}, 
-      lead rate ${formatChangeWithColor(leadRateChange, leadRateChange)}.`;
+    // Generate summary text with bullet points
+    const summaryText = `Compared to previous period:
+• Contacted: ${formatChangeWithColor(contactedChange, contactedChange)}
+• Reply Rate: ${formatChangeWithColor(replyRateChange, replyRateChange)}
+• Positive Replies: ${formatChangeWithColor(positiveRepliesChange, positiveRepliesChange)}`;
     
     return {
       totalContacted,
       totalReplies,
       positiveReplies,
-      leadRate: currentLeadRate.toFixed(1) + '%',
+      leadRate: currentReplyRate.toFixed(1) + '%',
       replyRate: currentReplyRate.toFixed(1) + '%',
       summaryText
     };
   }, [campaigns, previousCampaigns]);
 
+  // Update workspace selection to handle URL
+  const handleWorkspaceChange = (e) => {
+    const selectedId = e.target.value;
+    const selected = workspaces.find(w => w._id === selectedId);
+    if (selected) {
+      // Extract first part of the name (before any dashes)
+      const urlName = selected.name.split('-')[0].trim().toLowerCase();
+      console.log('Selected workspace:', selected.name, 'URL name:', urlName);
+      setSelectedWorkspace(selectedId);
+      navigate(`/${urlName}`);
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Effect to handle initial workspace selection from URL
+  useEffect(() => {
+    if (workspaces.length > 0 && workspaceName) {
+      console.log('Looking for workspace:', workspaceName);
+      // Match workspace by checking if any workspace name starts with the URL name
+      const workspace = workspaces.find(w => {
+        const firstPart = w.name.split('-')[0].trim().toLowerCase();
+        return firstPart === workspaceName.toLowerCase();
+      });
+      if (workspace) {
+        console.log('Found workspace:', workspace.name);
+        setSelectedWorkspace(workspace._id);
+      } else {
+        console.log('Workspace not found, redirecting to home');
+        navigate('/');
+      }
+    }
+  }, [workspaces, workspaceName, navigate]);
+
   useEffect(() => {
     fetchWorkspaces();
-  }, []);
+  }, [fetchWorkspaces]);
 
-  // Add debounce to data fetching
   useEffect(() => {
-    const fetchTimeout = setTimeout(() => {
+    if (selectedWorkspace) {
       fetchCampaigns();
-    }, 300); // 300ms debounce
-
-    return () => clearTimeout(fetchTimeout);
-  }, [selectedWorkspace, statusFilter, dateRange]);
+    }
+  }, [selectedWorkspace, fetchCampaigns]);
 
   const handleSort = useCallback((field) => {
     setSortBy(prevSort => {
@@ -262,9 +301,10 @@ function App() {
             <label>Workspace:</label>
             <select 
               value={selectedWorkspace} 
-              onChange={(e) => debouncedWorkspaceChange(e.target.value)}
+              onChange={handleWorkspaceChange}
               disabled={loading}
             >
+              <option value="">Select Workspace</option>
               {workspaces.map(workspace => (
                 <option key={workspace._id} value={workspace._id}>
                   {workspace.name}
@@ -378,6 +418,18 @@ function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+// Main App component with routing
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/:workspaceName" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

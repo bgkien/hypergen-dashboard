@@ -202,6 +202,7 @@ function App() {
       console.log('Campaign date check:', {
         campaignId: campaign._id,
         campaignName: campaign.camp_name,
+        status: campaign.status,
         campaignDate: campaignDate.toISOString(),
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
@@ -213,6 +214,7 @@ function App() {
         }
       });
 
+      // Include both ACTIVE and COMPLETED campaigns
       if (campaignDate >= startDate && campaignDate <= endDate) {
         const contacted = campaign.lead_contacted_count || 0;
         const replies = campaign.replied_count || 0;
@@ -225,6 +227,7 @@ function App() {
         // Log individual campaign contribution
         console.log('Adding stats from campaign:', {
           name: campaign.camp_name,
+          status: campaign.status,
           contacted,
           replies,
           positive

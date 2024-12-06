@@ -20,6 +20,17 @@ function logError(message, data = null) {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const APP_DOMAIN = import.meta.env.VITE_APP_DOMAIN;
 
+// Validate environment variables
+if (!API_BASE_URL) {
+  console.error('VITE_API_BASE_URL is not defined');
+}
+if (!APP_DOMAIN) {
+  console.error('VITE_APP_DOMAIN is not defined');
+}
+
+console.log('API Base URL:', API_BASE_URL);
+console.log('App Domain:', APP_DOMAIN);
+
 // Memoized table row component
 const TableRow = React.memo(({ campaign }) => (
   <tr>
@@ -87,7 +98,8 @@ function App() {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
-    timeout: 10000 // 10 second timeout
+    timeout: 10000, // 10 second timeout
+    withCredentials: false // Explicitly disable credentials
   }), []);
 
   // Debounce workspace change with shorter delay
@@ -180,25 +192,80 @@ function App() {
   useEffect(() => {
     const fetchWorkspaces = async () => {
       try {
-        logError('Fetching workspaces');
-        const response = await axios.get(`${API_BASE_URL}/api/workspaces`, axiosConfig);
-        logError('Workspaces Response', response.data);
+        logError('Fetching workspaces from:', `${API_BASE_URL}/api/workspaces`);
+        const response = await axios.get(`${API_BASE_URL}/api/workspaces`, {
+          ...axiosConfig,
+          headers: {
+            ...axiosConfig.headers,
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        
+        if (!response?.data) {
+          throw new Error('No data received from workspaces API');
+        }
+
+        logError('Workspaces Response:', response.data);
+        
+        if (!Array.isArray(response.data) || response.data.length === 0) {
+          setError('No workspaces found');
+          return;
+        }
+
         setWorkspaces(response.data);
 
         // If no workspace is selected but we have workspaces, select the first one
         if (!selectedWorkspace && response.data.length > 0) {
           const firstWorkspace = response.data[0];
+          logError('Setting first workspace:', firstWorkspace);
           setSelectedWorkspace(firstWorkspace);
           localStorage.setItem('selectedWorkspace', JSON.stringify(firstWorkspace));
         }
       } catch (error) {
-        logError('Workspaces Error', error);
-        setError('Failed to fetch workspaces');
+        const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch workspaces';
+        logError('Workspaces Error:', {
+          message: errorMessage,
+          status: error.response?.status,
+          data: error.response?.data,
+          config: error.config
+        });
+        setError(errorMessage);
       }
     };
 
     fetchWorkspaces();
   }, []); // Only run once on mount
+
+  // Handle workspace selection
+  const handleWorkspaceChange = useCallback((workspaceId) => {
+    logError('Workspace change:', workspaceId);
+    const workspace = workspaces.find(w => w._id === workspaceId);
+    if (workspace) {
+      logError('Setting workspace:', workspace);
+      setSelectedWorkspace(workspace);
+      localStorage.setItem('selectedWorkspace', JSON.stringify(workspace));
+    } else {
+      logError('Workspace not found:', workspaceId);
+      setError('Invalid workspace selection');
+    }
+  }, [workspaces]);
+
+  // Initialize selectedWorkspace from localStorage
+  useEffect(() => {
+    const savedWorkspace = localStorage.getItem('selectedWorkspace');
+    if (savedWorkspace) {
+      try {
+        const workspace = JSON.parse(savedWorkspace);
+        if (workspace?._id) {
+          logError('Restoring workspace from localStorage:', workspace);
+          setSelectedWorkspace(workspace);
+        }
+      } catch (error) {
+        logError('Error parsing saved workspace:', error);
+        localStorage.removeItem('selectedWorkspace');
+      }
+    }
+  }, []);
 
   // Fetch campaign data when workspace changes
   useEffect(() => {
@@ -215,8 +282,14 @@ function App() {
       setError(null);
 
       try {
+        if (!selectedWorkspace?._id) {
+          logError('No workspace ID available', selectedWorkspace);
+          setError('Please select a workspace');
+          return;
+        }
+
         const params = {
-          workspace_id: selectedWorkspace._id,
+          workspaceId: selectedWorkspace._id, // Changed from workspace_id to workspaceId to match backend
           status: statusFilter === 'ALL' ? undefined : statusFilter
         };
 
@@ -227,6 +300,8 @@ function App() {
         if (dateRange?.endDate instanceof Date) {
           params.end_date = dateRange.endDate.toISOString();
         }
+
+        logError('Fetching with params:', params);
 
         const response = await axios.get(`${API_BASE_URL}/api/campaign-stats`, {
           ...axiosConfig,
@@ -331,8 +406,8 @@ function App() {
 
         <div className="filters">
           <select 
-            value={selectedWorkspace} 
-            onChange={(e) => debouncedWorkspaceChange(e.target.value)}
+            value={selectedWorkspace?._id} 
+            onChange={(e) => handleWorkspaceChange(e.target.value)}
           >
             {workspaces.map(workspace => (
               <option key={workspace._id} value={workspace._id}>
